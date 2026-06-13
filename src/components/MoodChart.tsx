@@ -15,6 +15,31 @@ interface ChartPoint {
   stress: number
 }
  
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: { color: string; name: string; value: number }[]
+  label?: string
+}
+ 
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="px-3 py-2 rounded-xl text-sm"
+      style={{
+        background: 'rgba(10,14,26,0.95)',
+        border: '1px solid rgba(99,119,255,0.2)',
+        backdropFilter: 'blur(10px)',
+      }}>
+      <p className="font-semibold mb-1">{label}</p>
+      {payload.map(p => (
+        <p key={p.name} style={{ color: p.color }}>
+          {p.name}: <span className="font-bold">{p.value}</span>
+        </p>
+      ))}
+    </div>
+  )
+}
+ 
 export default function MoodChart({ moods }: MoodChartProps) {
   // Show empty state if < 2 data points
   if (moods.length < 2) {
@@ -45,29 +70,6 @@ export default function MoodChart({ moods }: MoodChartProps) {
       mood: m.mood,
       stress: m.stressLevel,
     }))
- 
-  const CustomTooltip = ({ active, payload, label }: {
-    active?: boolean
-    payload?: { color: string; name: string; value: number }[]
-    label?: string
-  }) => {
-    if (!active || !payload?.length) return null
-    return (
-      <div className="px-3 py-2 rounded-xl text-sm"
-        style={{
-          background: 'rgba(10,14,26,0.95)',
-          border: '1px solid rgba(99,119,255,0.2)',
-          backdropFilter: 'blur(10px)',
-        }}>
-        <p className="font-semibold mb-1">{label}</p>
-        {payload.map(p => (
-          <p key={p.name} style={{ color: p.color }}>
-            {p.name}: <span className="font-bold">{p.value}</span>
-          </p>
-        ))}
-      </div>
-    )
-  }
  
   return (
     <div 

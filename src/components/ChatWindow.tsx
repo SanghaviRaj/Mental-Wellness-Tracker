@@ -1,97 +1,37 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ChatMessage, ExamType } from '../types'
-import { chatStorage, generateId } from '../utils/storage'
-import { streamChat } from '../utils/ai'
-import { sanitizeText } from '../utils/sanitize'
 import { format } from 'date-fns'
  
 interface ChatWindowProps {
   examType: ExamType
-  studentName: string
+  messages: ChatMessage[]
+  input: string
+  setInput: (value: string) => void
+  streaming: boolean
+  streamText: string
+  error: string | null
+  handleSend: () => void
+  handleClear: () => void
 }
  
-export default function ChatWindow({ examType, studentName }: ChatWindowProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState('')
-  const [streaming, setStreaming] = useState(false)
-  const [streamText, setStreamText] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  
+export default function ChatWindow({
+  examType,
+  messages,
+  input,
+  setInput,
+  streaming,
+  streamText,
+  error,
+  handleSend,
+  handleClear
+}: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
- 
-  // Load saved chat history on mount
-  useEffect(() => {
-    setMessages(chatStorage.getAll())
-  }, [])
  
   // Auto-scroll to bottom of messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamText, streaming])
- 
-  const saveHistory = (newMsgs: ChatMessage[]) => {
-    setMessages(newMsgs)
-    chatStorage.save(newMsgs)
-  }
- 
-  const handleSend = async () => {
-    const text = input.trim()
-    if (!text || streaming) return
- 
-    const sanitized = sanitizeText(text)
-    if (!sanitized) return
- 
-    const userMsg: ChatMessage = {
-      id: generateId(),
-      role: 'user',
-      content: sanitized,
-      timestamp: new Date().toISOString(),
-    }
- 
-    const updatedMessages = [...messages, userMsg]
-    saveHistory(updatedMessages)
-    setInput('')
-    setStreaming(true)
-    setStreamText('')
-    setError(null)
- 
-    try {
-      let accumulated = ''
-      // Format messages history to match API requirements
-      const apiMessages = updatedMessages.map(m => ({
-        role: m.role,
-        content: m.content,
-      }))
- 
-      await streamChat(
-        apiMessages,
-        examType,
-        studentName,
-        (chunk) => {
-          accumulated += chunk
-          setStreamText(accumulated)
-        },
-        () => {
-          const aiMsg: ChatMessage = {
-            id: generateId(),
-            role: 'assistant',
-            content: accumulated,
-            timestamp: new Date().toISOString(),
-          }
-          saveHistory([...updatedMessages, aiMsg])
-          setStreaming(false)
-          setStreamText('')
-          // Focus input after done
-          setTimeout(() => inputRef.current?.focus(), 50)
-        }
-      )
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'AI service error. Please check your API key in Settings.')
-      setStreaming(false)
-      setStreamText('')
-    }
-  }
  
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -100,15 +40,13 @@ export default function ChatWindow({ examType, studentName }: ChatWindowProps) {
     }
   }
  
-  // Clear chat button with confirmation
-  const handleClear = () => {
-    if (window.confirm('Are you sure you want to clear your chat history? This cannot be undone.')) {
-      chatStorage.clear()
-      setMessages([])
-      setStreamText('')
-      setStreaming(false)
-      setError(null)
-    }
+  const handleStarterClick = (s: string) => {
+    setInput(s)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+ 
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value)
   }
  
   const STARTERS = [
@@ -212,10 +150,7 @@ export default function ChatWindow({ examType, studentName }: ChatWindowProps) {
           {STARTERS.map(s => (
             <button 
               key={s} 
-              onClick={() => {
-                setInput(s)
-                inputRef.current?.focus()
-              }}
+              onClick={() => handleStarterClick(s)}
               className="text-xs text-left p-3 rounded-xl transition-all hover:bg-[rgba(99,119,255,0.1)]"
               style={{ 
                 background: 'rgba(99,119,255,0.04)', 
@@ -243,7 +178,7 @@ export default function ChatWindow({ examType, studentName }: ChatWindowProps) {
         <textarea
           ref={inputRef}
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder="Ask Antigravity anything… (Enter to send, Shift+Enter for new line)"
           rows={2}

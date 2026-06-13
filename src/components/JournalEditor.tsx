@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { sanitizeText, validateJournalContent } from '../utils/sanitize'
+import { STORAGE_KEYS, CHARACTER_LIMITS, TIMERS } from '../constants'
  
 interface JournalEditorProps {
   examType: string
@@ -9,7 +10,7 @@ interface JournalEditorProps {
  
 export default function JournalEditor({ examType, onSave, saving = false }: JournalEditorProps) {
   // Load draft from localStorage on mount
-  const [content, setContent] = useState(() => localStorage.getItem('ag_journal_draft') ?? '')
+  const [content, setContent] = useState(() => localStorage.getItem(STORAGE_KEYS.DRAFT) ?? '')
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const contentRef = useRef(content)
@@ -19,13 +20,13 @@ export default function JournalEditor({ examType, onSave, saving = false }: Jour
     contentRef.current = content
   }, [content])
  
-  // Auto-save to localStorage every 30 seconds
+  // Auto-save to localStorage every interval
   useEffect(() => {
     const interval = setInterval(() => {
       if (contentRef.current.trim()) {
-        localStorage.setItem('ag_journal_draft', contentRef.current)
+        localStorage.setItem(STORAGE_KEYS.DRAFT, contentRef.current)
       }
-    }, 30000)
+    }, TIMERS.DRAFT_AUTOSAVE_INTERVAL_MS)
  
     return () => {
       clearInterval(interval)
@@ -33,8 +34,8 @@ export default function JournalEditor({ examType, onSave, saving = false }: Jour
   }, [])
  
   const charCount = content.length
-  // Submit button disabled until 50+ chars
-  const isDisabled = charCount < 50 || charCount > 1000 || saving
+  // Submit button disabled based on character limits
+  const isDisabled = charCount < CHARACTER_LIMITS.JOURNAL_MIN_LENGTH || charCount > CHARACTER_LIMITS.JOURNAL_MAX_LENGTH || saving
  
   const handleSave = () => {
     const err = validateJournalContent(content)
@@ -50,10 +51,23 @@ export default function JournalEditor({ examType, onSave, saving = false }: Jour
  
     // Clear content and remove draft from localStorage
     setContent('')
-    localStorage.removeItem('ag_journal_draft')
+    localStorage.removeItem(STORAGE_KEYS.DRAFT)
   }
  
-  const charColor = charCount < 50 ? '#fb7185' : charCount > 950 ? '#fbbf24' : '#2dd4bf'
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setContent(e.target.value)
+    setError(null)
+  }
+ 
+  const handlePromptClick = (prompt: string) => {
+    setContent(prev => prev ? prev.trim() + ' ' + prompt : prompt + ' ')
+    textareaRef.current?.focus()
+    setError(null)
+  }
+ 
+  const minLen = CHARACTER_LIMITS.JOURNAL_MIN_LENGTH
+  const maxLen = CHARACTER_LIMITS.JOURNAL_MAX_LENGTH
+  const charColor = charCount < minLen ? '#fb7185' : charCount > (maxLen - 50) ? '#fbbf24' : '#2dd4bf'
  
   const prompts = [
     'What challenged me today in my preparation?',
@@ -75,7 +89,7 @@ export default function JournalEditor({ examType, onSave, saving = false }: Jour
           background: 'rgba(99,119,255,0.1)',
           color: charColor
         }}>
-          {charCount}/1000
+          {charCount}/{maxLen}
         </span>
       </div>
  
@@ -84,11 +98,7 @@ export default function JournalEditor({ examType, onSave, saving = false }: Jour
         {prompts.map(p => (
           <button
             key={p}
-            onClick={() => {
-              setContent(prev => prev ? prev.trim() + ' ' + p : p + ' ')
-              textareaRef.current?.focus()
-              setError(null)
-            }}
+            onClick={() => handlePromptClick(p)}
             className="text-xs px-3 py-1.5 rounded-lg transition-all"
             style={{
               background: 'rgba(99,119,255,0.08)',
@@ -106,13 +116,10 @@ export default function JournalEditor({ examType, onSave, saving = false }: Jour
         <textarea
           ref={textareaRef}
           value={content}
-          onChange={e => {
-            setContent(e.target.value)
-            setError(null)
-          }}
-          placeholder="Start writing about your day, your feelings, your progress (minimum 50 characters)…"
+          onChange={handleTextareaChange}
+          placeholder={`Start writing about your day, your feelings, your progress (minimum ${minLen} characters)…`}
           rows={8}
-          maxLength={1000}
+          maxLength={maxLen}
           className="input-field resize-none w-full"
           aria-label="Journal entry input"
           aria-describedby={error ? 'journal-error-inline' : undefined}
@@ -131,7 +138,7 @@ export default function JournalEditor({ examType, onSave, saving = false }: Jour
         <div
           className="h-full rounded-full transition-all duration-300"
           style={{
-            width: `${Math.min((charCount / 1000) * 100, 100)}%`,
+            width: `${Math.min((charCount / maxLen) * 100, 100)}%`,
             background: `linear-gradient(90deg, ${charColor}, #6377ff)`
           }}
         />

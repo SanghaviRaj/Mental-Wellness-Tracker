@@ -24,9 +24,22 @@ interface DashboardProps {
   onNavigate: (page: Page) => void
 }
  
+interface StatCardProps {
+  emoji: string
+  label: string
+  value: string
+  color: string
+}
+ 
+interface QuickActionProps {
+  emoji: string
+  label: string
+  onClick: () => void
+}
+ 
 export default function Dashboard({ profile, moods, journals, onNavigate }: DashboardProps) {
   const today = new Date()
-  const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000)
+  const dayOfYear = differenceInDays(today, new Date(today.getFullYear(), 0, 0))
   const quote = QUOTES[dayOfYear % QUOTES.length]
  
   // Last 7 days moods
@@ -51,6 +64,19 @@ export default function Dashboard({ profile, moods, journals, onNavigate }: Dash
   const streakDays = calculateStreak(moods)
   const latestInsight = insightStorage.get()
  
+  const handleLogMoodClick = () => {
+    onNavigate('mood')
+  }
+ 
+  const handleCardChatClick = () => {
+    onNavigate('chat')
+  }
+ 
+  const handleChatButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    onNavigate('chat')
+  }
+ 
   return (
     <div className="space-y-6">
       {/* Header with name + exam badge */}
@@ -71,7 +97,7 @@ export default function Dashboard({ profile, moods, journals, onNavigate }: Dash
  
         {/* Today's mood quick-log shortcut button */}
         <button
-          onClick={() => onNavigate('mood')}
+          onClick={handleLogMoodClick}
           className="btn-primary flex items-center justify-center gap-2 text-sm font-medium self-start md:self-auto px-4 py-2 relative z-10"
           aria-label="Log today's mood page"
           type="button"
@@ -87,7 +113,7 @@ export default function Dashboard({ profile, moods, journals, onNavigate }: Dash
           background: 'linear-gradient(135deg, rgba(99,119,255,0.08), rgba(45,212,191,0.04))',
           border: '1px solid rgba(99,119,255,0.15)'
         }}
-        onClick={() => onNavigate('chat')}
+        onClick={handleCardChatClick}
         role="link"
         aria-label="How are you feeling? Chat with Antigravity"
       >
@@ -100,10 +126,7 @@ export default function Dashboard({ profile, moods, journals, onNavigate }: Dash
         <button 
           className="btn-secondary text-xs flex items-center gap-1.5 flex-shrink-0 relative z-10"
           type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onNavigate('chat')
-          }}
+          onClick={handleChatButtonClick}
         >
           <span>💬</span> Chat with Antigravity
         </button>
@@ -256,7 +279,7 @@ export default function Dashboard({ profile, moods, journals, onNavigate }: Dash
   )
 }
  
-function StatCard({ emoji, label, value, color }: { emoji: string; label: string; value: string; color: string }) {
+function StatCard({ emoji, label, value, color }: StatCardProps) {
   return (
     <div className="card card-hover animate-fade-in-up">
       <p className="text-2xl mb-1 select-none">{emoji}</p>
@@ -265,8 +288,8 @@ function StatCard({ emoji, label, value, color }: { emoji: string; label: string
     </div>
   )
 }
- 
-function QuickAction({ emoji, label, onClick }: { emoji: string; label: string; onClick: () => void }) {
+
+function QuickAction({ emoji, label, onClick }: QuickActionProps) {
   return (
     <button onClick={onClick}
       className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left relative z-10 hover:bg-[rgba(99,119,255,0.1)]"

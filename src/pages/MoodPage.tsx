@@ -1,10 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useEffect } from 'react'
 import type { MoodLog, UserProfile, Page } from '../types'
 import type { MoodScore } from '../types'
 import MoodPicker from '../components/MoodPicker'
 import MoodChart from '../components/MoodChart'
-import { moodStorage, generateId } from '../utils/storage'
-import { validateMoodInput } from '../utils/sanitize'
+import { useMoodLogs } from '../hooks/useMoodLogs'
 import { format } from 'date-fns'
  
 const MOOD_EMOJIS: Record<number, string> = { 1: '😞', 2: '😟', 3: '😐', 4: '🙂', 5: '😁' }
@@ -17,28 +16,21 @@ interface MoodPageProps {
   onNavigate: (page: Page) => void
 }
  
-export default function MoodPage({ profile, moods, onMoodsUpdate, onNavigate }: MoodPageProps) {
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+export default function MoodPage({ profile, onMoodsUpdate, onNavigate }: MoodPageProps) {
+  const { moods, saving, saved, error, addMood } = useMoodLogs()
  
-  const handleSave = useCallback((mood: MoodScore, stress: number, note: string) => {
-    if (!validateMoodInput(mood, stress)) return
-    setSaving(true)
-    const log: MoodLog = {
-      id: generateId(),
-      timestamp: new Date().toISOString(),
-      mood,
-      stressLevel: stress,
-      examType: profile.examType,
-      note: note || undefined,
-    }
-    moodStorage.save(log)
-    const updated = moodStorage.getAll()
-    onMoodsUpdate(updated)
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
-  }, [profile.examType, onMoodsUpdate])
+  // Sync back to global/parent state
+  useEffect(() => {
+    onMoodsUpdate(moods)
+  }, [moods, onMoodsUpdate])
+ 
+  const handleSave = (mood: MoodScore, stress: number, note: string) => {
+    addMood(mood, stress, note, profile.examType)
+  }
+ 
+  const handleNavigateInsights = () => {
+    onNavigate('insights')
+  }
  
   const last14 = moods.slice(-14)
   const avgMood7 = moods.slice(-7).reduce((s, m) => s + m.mood, 0) / (moods.slice(-7).length || 1)
@@ -61,6 +53,14 @@ export default function MoodPage({ profile, moods, onMoodsUpdate, onNavigate }: 
         </div>
       )}
  
+      {/* Error message */}
+      {error && (
+        <div className="p-3 rounded-xl text-sm font-medium text-center animate-fade-in"
+          style={{ background: 'rgba(251,113,133,0.1)', border: '1px solid rgba(251,113,133,0.3)', color: '#fb7185' }}>
+          ⚠️ {error}
+        </div>
+      )}
+ 
       {/* Link to Insights after 3+ entries */}
       {moods.length >= 3 && (
         <div 
@@ -77,7 +77,7 @@ export default function MoodPage({ profile, moods, onMoodsUpdate, onNavigate }: 
             </p>
           </div>
           <button
-            onClick={() => onNavigate('insights')}
+            onClick={handleNavigateInsights}
             className="btn-secondary text-xs flex-shrink-0 relative z-10 px-3 py-1.5"
             type="button"
           >

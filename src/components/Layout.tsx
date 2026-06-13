@@ -1,6 +1,6 @@
 import type { Page, UserProfile } from '../types'
 import NavBar from './NavBar'
-
+ 
 interface LayoutProps {
   children: React.ReactNode
   currentPage: Page
@@ -8,7 +8,11 @@ interface LayoutProps {
   profile: UserProfile | null
   onOpenSettings: () => void
 }
-
+ 
+interface ExamCountdownProps {
+  examDate: string
+}
+ 
 export default function Layout({ children, currentPage, onNavigate, profile, onOpenSettings }: LayoutProps) {
   return (
     <div className="relative min-h-screen flex" style={{ background: 'var(--bg-primary)' }}>
@@ -16,7 +20,7 @@ export default function Layout({ children, currentPage, onNavigate, profile, onO
       <div className="blob blob-1" />
       <div className="blob blob-2" />
       <div className="blob blob-3" />
-
+ 
       {/* Sidebar — desktop */}
       <aside className="hidden md:flex flex-col w-60 min-h-screen sticky top-0 z-20 p-4 gap-2"
         style={{ borderRight: '1px solid rgba(99,119,255,0.1)', background: 'rgba(10,14,26,0.85)', backdropFilter: 'blur(20px)' }}>
@@ -28,7 +32,7 @@ export default function Layout({ children, currentPage, onNavigate, profile, onO
           </div>
           <span className="font-bold text-lg gradient-text" style={{ fontFamily: 'Outfit,sans-serif' }}>Antigravity</span>
         </div>
-
+ 
         {/* Profile badge */}
         {profile && (
           <div className="glass-lighter rounded-2xl p-3 mb-2">
@@ -47,19 +51,19 @@ export default function Layout({ children, currentPage, onNavigate, profile, onO
             )}
           </div>
         )}
-
+ 
         {/* Nav items */}
         <nav className="flex flex-col gap-1 flex-1">
           <NavBar currentPage={currentPage} onNavigate={onNavigate} variant="sidebar" />
         </nav>
-
+ 
         {/* Settings */}
         <button onClick={onOpenSettings} className="nav-item w-full" aria-label="Open settings">
           <span>⚙️</span>
           <span>Settings</span>
         </button>
       </aside>
-
+ 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen relative z-10">
         {/* Mobile top bar */}
@@ -73,12 +77,12 @@ export default function Layout({ children, currentPage, onNavigate, profile, onO
           <button onClick={onOpenSettings} aria-label="Settings" className="p-2 rounded-xl"
             style={{ background: 'rgba(99,119,255,0.1)' }}>⚙️</button>
         </header>
-
+ 
         {/* Page content */}
         <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-5xl mx-auto w-full">
           {children}
         </main>
-
+ 
         {/* Mobile bottom nav */}
         <nav className="md:hidden sticky bottom-0 z-20 px-4 pb-4 pt-2"
           style={{ background: 'rgba(10,14,26,0.9)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(99,119,255,0.1)' }}>
@@ -88,10 +92,12 @@ export default function Layout({ children, currentPage, onNavigate, profile, onO
     </div>
   )
 }
-
-function ExamCountdown({ examDate }: { examDate: string }) {
+ 
+function ExamCountdown({ examDate }: ExamCountdownProps) {
   const days = Math.ceil((new Date(examDate).getTime() - Date.now()) / 86_400_000)
-  if (days < 0) return null
+  if (days < 0) {
+    return null
+  }
   const color = days <= 30 ? '#fb7185' : days <= 90 ? '#fbbf24' : '#2dd4bf'
   return (
     <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(99,119,255,0.1)' }}>

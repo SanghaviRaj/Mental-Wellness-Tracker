@@ -1,26 +1,34 @@
 import type { ExamType, InsightResult, JournalEntry, MoodLog } from '../types'
+import { STORAGE_KEYS, AI_CONFIG, RATE_LIMITS } from '../constants'
  
-const API_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL   = 'claude-sonnet-4-6'
- 
-// SECURITY: Read-only from env, never hardcoded
 const getKey = (): string => {
-  const key = import.meta.env.VITE_ANTHROPIC_API_KEY as string
-  if (!key || !key.startsWith('sk-ant-')) throw new Error('Invalid API key configuration.')
+  const key = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined
+  if (!key || !key.startsWith('sk-ant-')) {
+    throw new Error('Invalid API key configuration.')
+  }
   return key
 }
  
-// Rate limiting — max 20 AI calls per hour via localStorage counter
 function checkRateLimit(): void {
   const now = Date.now()
-  const windowStart = now - 60 * 60 * 1000
-  const raw = localStorage.getItem('ag_rate') ?? '[]'
-  const calls: number[] = JSON.parse(raw).filter((t: number) => t > windowStart)
-  if (calls.length >= 20) throw new Error('You have reached the AI usage limit (20/hour). Please wait a bit.')
-  localStorage.setItem('ag_rate', JSON.stringify([...calls, now]))
+  const windowStart = now - RATE_LIMITS.AI_WINDOW_MS
+  const raw = localStorage.getItem(STORAGE_KEYS.RATE_LIMIT) ?? '[]'
+  
+  try {
+    const calls: number[] = (JSON.parse(raw) as number[]).filter((t: number) => t > windowStart)
+    if (calls.length >= RATE_LIMITS.AI_MAX_CALLS_PER_HOUR) {
+      throw new Error(`You have reached the AI usage limit (${RATE_LIMITS.AI_MAX_CALLS_PER_HOUR}/hour). Please wait a bit.`)
+    }
+    localStorage.setItem(STORAGE_KEYS.RATE_LIMIT, JSON.stringify([...calls, now]))
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('usage limit')) {
+      throw e
+    }
+    // Reset rate limit storage if parsing fails
+    localStorage.setItem(STORAGE_KEYS.RATE_LIMIT, JSON.stringify([now]))
+  }
 }
  
-// Shared system prompt — empathetic, safe, exam-context-aware
 function buildSystemPrompt(examType: ExamType, studentName: string): string {
   return `You are Antigravity, a warm and empathetic mental wellness companion built specifically for ${studentName}, who is preparing for ${examType}.
  
@@ -34,7 +42,6 @@ Your role:
 Tone: Warm, peer-like, never clinical. Use simple language. Acknowledge their specific exam (${examType}) challenges. Keep responses concise and actionable.`
 }
  
-// ── Chat (streaming) ──────────────────────────────────────────────────────────
 export async function streamChat(
   messages: { role: 'user' | 'assistant'; content: string }[],
   examType: ExamType,
@@ -44,16 +51,16 @@ export async function streamChat(
 ): Promise<void> {
   checkRateLimit()
  
-  const res = await fetch(API_URL, {
+  const res = await fetch(AI_CONFIG.API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': getKey(),
-      'anthropic-version': '2023-06-01',
+      'anthropic-version': AI_CONFIG.ANTHROPIC_VERSION,
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: AI_CONFIG.MODEL_NAME,
       max_tokens: 1024,
       stream: true,
       system: buildSystemPrompt(examType, studentName),
@@ -61,25 +68,42 @@ export async function streamChat(
     }),
   })
  
-  if (!res.ok) throw new Error(`AI service error: ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`AI service error: ${res.status}`)
+  }
  
-  const reader = res.body!.getReader()
+  const body = res.body
+  if (!body) {
+    throw new Error('Response body is null.')
+  }
+ 
+  const reader = body.getReader()
   const decoder = new TextDecoder()
  
   while (true) {
     const { done, value } = await reader.read()
-    if (done) { onDone(); break }
-    const lines = decoder.decode(value).split('\n').filter(l => l.startsWith('data: '))
+    if (done) {
+      onDone()
+      break
+    }
+    const decoded = decoder.decode(value)
+    const lines = decoded.split('\n').filter((l: string) => l.startsWith('data: '))
     for (const line of lines) {
       try {
-        const json = JSON.parse(line.slice(6))
-        if (json.type === 'content_block_delta') onChunk(json.delta.text ?? '')
-      } catch { /* skip malformed chunks */ }
+        const json = JSON.parse(line.slice(6)) as {
+          type: string
+          delta?: { text?: string }
+        }
+        if (json.type === 'content_block_delta') {
+          onChunk(json.delta?.text ?? '')
+        }
+      } catch {
+        /* skip malformed chunks */
+      }
     }
   }
 }
  
-// ── Journal Insight Analysis ──────────────────────────────────────────────────
 export async function analyzeJournals(
   journals: JournalEntry[],
   moods: MoodLog[],
@@ -89,11 +113,11 @@ export async function analyzeJournals(
   checkRateLimit()
  
   const journalText = journals.map(
-    (j, i) => `Entry ${i + 1} (${j.timestamp.slice(0, 10)}): ${j.content}`
+    (j: JournalEntry, i: number) => `Entry ${i + 1} (${j.timestamp.slice(0, 10)}): ${j.content}`
   ).join('\n\n')
  
   const moodSummary = moods.map(
-    m => `${m.timestamp.slice(0, 10)}: mood=${m.mood}/5, stress=${m.stressLevel}/10`
+    (m: MoodLog) => `${m.timestamp.slice(0, 10)}: mood=${m.mood}/5, stress=${m.stressLevel}/10`
   ).join('\n')
  
   const prompt = `Analyse these journal entries and mood logs for ${studentName} (preparing for ${examType}).
@@ -121,25 +145,34 @@ Respond ONLY with a valid JSON object in this exact shape:
 }
 Return 3 coping strategies. No extra text, no markdown fences.`
  
-  const res = await fetch(API_URL, {
+  const res = await fetch(AI_CONFIG.API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': getKey(),
-      'anthropic-version': '2023-06-01',
+      'anthropic-version': AI_CONFIG.ANTHROPIC_VERSION,
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: AI_CONFIG.MODEL_NAME,
       max_tokens: 1024,
       system: buildSystemPrompt(examType, studentName),
       messages: [{ role: 'user', content: prompt }],
     }),
   })
  
-  if (!res.ok) throw new Error(`Analysis failed: ${res.status}`)
-  const data = await res.json()
-  const raw = data.content[0].text as string
+  if (!res.ok) {
+    throw new Error(`Analysis failed: ${res.status}`)
+  }
+  
+  const data = await res.json() as {
+    content?: { text?: string }[]
+  }
+  
+  const raw = data.content?.[0]?.text
+  if (!raw) {
+    throw new Error('AI returned an empty response.')
+  }
  
   try {
     return JSON.parse(raw) as InsightResult

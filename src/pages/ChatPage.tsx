@@ -1,11 +1,20 @@
 import type { UserProfile } from '../types'
 import ChatWindow from '../components/ChatWindow'
+import { useChat } from '../hooks/useChat'
  
 interface ChatPageProps {
   profile: UserProfile
 }
  
 export default function ChatPage({ profile }: ChatPageProps) {
+  const chatProps = useChat(profile.examType, profile.name)
+
+  const handleClearWithConfirmation = () => {
+    if (window.confirm('Are you sure you want to clear your chat history? This cannot be undone.')) {
+      chatProps.handleClear()
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-10rem)] md:h-[calc(100vh-6rem)] max-h-[850px] space-y-4">
       {/* Context banner */}
@@ -27,7 +36,17 @@ export default function ChatPage({ profile }: ChatPageProps) {
  
       {/* Full screen ChatWindow */}
       <div className="flex-1 min-h-0 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-        <ChatWindow examType={profile.examType} studentName={profile.name} />
+        <ChatWindow
+          examType={profile.examType}
+          messages={chatProps.messages}
+          input={chatProps.input}
+          setInput={chatProps.setInput}
+          streaming={chatProps.streaming}
+          streamText={chatProps.streamText}
+          error={chatProps.error}
+          handleSend={chatProps.handleSend}
+          handleClear={handleClearWithConfirmation}
+        />
       </div>
     </div>
   )

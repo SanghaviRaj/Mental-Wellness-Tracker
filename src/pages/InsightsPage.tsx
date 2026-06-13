@@ -1,21 +1,24 @@
-import { useState, useCallback, useEffect } from 'react'
-import type { MoodLog, JournalEntry, InsightResult, UserProfile } from '../types'
+import { useState, useEffect } from 'react'
+import type { MoodLog, JournalEntry, UserProfile } from '../types'
 import InsightCard from '../components/InsightCard'
-import { analyzeJournals } from '../utils/ai'
-import { insightStorage } from '../utils/storage'
- 
+import { BOX_BREATHING } from '../constants'
+import { useInsights } from '../hooks/useInsights'
+
+interface BoxBreathingProps {}
+
 // Interactive box breathing exercise
-function BoxBreathing() {
+function BoxBreathing(_props: BoxBreathingProps) {
   const [phase, setPhase] = useState<'idle' | 'inhale' | 'hold1' | 'exhale' | 'hold2'>('idle')
   const [count, setCount] = useState(0)
   const [cycles, setCycles] = useState(0)
-  const MAX_CYCLES = 4
+  const MAX_CYCLES = BOX_BREATHING.MAX_CYCLES
+  const CYCLE_SECONDS = BOX_BREATHING.CYCLE_SECONDS
  
   const PHASES: { key: typeof phase; label: string; duration: number; color: string }[] = [
-    { key: 'inhale', label: 'Inhale',      duration: 4, color: '#6377ff' },
-    { key: 'hold1',  label: 'Hold',        duration: 4, color: '#a855f7' },
-    { key: 'exhale', label: 'Exhale',      duration: 4, color: '#2dd4bf' },
-    { key: 'hold2',  label: 'Hold',        duration: 4, color: '#fbbf24' },
+    { key: 'inhale', label: 'Inhale',      duration: CYCLE_SECONDS, color: '#6377ff' },
+    { key: 'hold1',  label: 'Hold',        duration: CYCLE_SECONDS, color: '#a855f7' },
+    { key: 'exhale', label: 'Exhale',      duration: CYCLE_SECONDS, color: '#2dd4bf' },
+    { key: 'hold2',  label: 'Hold',        duration: CYCLE_SECONDS, color: '#fbbf24' },
   ]
  
   useEffect(() => {
@@ -41,13 +44,21 @@ function BoxBreathing() {
  
   const current = PHASES.find(p => p.key === phase)
   const progress = phase !== 'idle' && current ? (count / current.duration) * 100 : 0
+
+  const handleStartStopClick = () => {
+    if (phase === 'idle') {
+      start()
+    } else {
+      stop()
+    }
+  }
  
   return (
     <div className="card text-center space-y-4">
       <div>
         <h3 className="font-semibold" style={{ fontFamily: 'Outfit,sans-serif' }}>Box Breathing</h3>
         <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-          4-4-4-4 pattern · {MAX_CYCLES} cycles · ~1.5 minutes
+          {CYCLE_SECONDS}-{CYCLE_SECONDS}-{CYCLE_SECONDS}-{CYCLE_SECONDS} pattern · {MAX_CYCLES} cycles · ~1.5 minutes
         </p>
       </div>
  
@@ -103,7 +114,7 @@ function BoxBreathing() {
       )}
  
       <button
-        onClick={phase === 'idle' ? start : stop}
+        onClick={handleStartStopClick}
         className={phase === 'idle' ? 'btn-primary relative z-10' : 'btn-secondary'}
         aria-label={phase === 'idle' ? 'Start box breathing exercise' : 'Stop exercise'}
         type="button"
@@ -160,37 +171,18 @@ interface InsightsPageProps {
   journals: JournalEntry[]
 }
  
-const RISK_STYLES = {
+const RISK_STYLES: Record<string, { text: string; border: string; bg: string }> = {
   low: { text: '#2dd4bf', border: 'rgba(45,212,191,0.25)', bg: 'rgba(45,212,191,0.06)' },
   moderate: { text: '#fbbf24', border: 'rgba(251,191,36,0.25)', bg: 'rgba(251,191,36,0.06)' },
   high: { text: '#fb7185', border: 'rgba(251,113,133,0.25)', bg: 'rgba(251,113,133,0.06)' }
 }
  
 export default function InsightsPage({ profile, moods, journals }: InsightsPageProps) {
-  const [insight, setInsight] = useState<InsightResult | null>(() => insightStorage.get())
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
- 
-  const handleAnalyze = useCallback(async () => {
-    if (journals.length < 3) return
-    setLoading(true)
-    setError(null)
- 
-    try {
-      const result = await analyzeJournals(
-        journals,
-        moods,
-        profile.examType,
-        profile.name
-      )
-      setInsight(result)
-      insightStorage.save(result)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'AI analysis failed. Please check your API key in Settings.')
-    } finally {
-      setLoading(false)
-    }
-  }, [moods, journals, profile.examType, profile.name])
+  const { insight, loading, error, generateReport } = useInsights(profile.examType, profile.name)
+
+  const handleAnalyze = () => {
+    generateReport(journals, moods)
+  }
  
   const canGenerate = journals.length >= 3
  

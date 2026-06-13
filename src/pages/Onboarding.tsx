@@ -46,6 +46,29 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     onComplete(profile)
   }
 
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value)
+    setNameError('')
+  }
+
+  const handleExamTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setExamType(e.target.value as ExamType)
+  }
+
+  const handleExamDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setExamDate(e.target.value)
+  }
+
+  const handleStepBack = () => {
+    setStep(1)
+  }
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleStep1()
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ background: 'var(--bg-primary)' }}>
       <div className="blob blob-1" />
@@ -95,13 +118,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   id="name-input"
                   type="text"
                   value={name}
-                  onChange={e => { setName(e.target.value); setNameError('') }}
+                  onChange={handleNameChange}
                   placeholder="e.g. Priya"
                   maxLength={50}
                   className="input-field"
                   aria-describedby={nameError ? 'name-error' : undefined}
                   aria-invalid={!!nameError}
-                  onKeyDown={e => e.key === 'Enter' && handleStep1()}
+                  onKeyDown={handleNameKeyDown}
                   autoFocus
                 />
                 {nameError && (
@@ -133,7 +156,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 <select
                   id="exam-select"
                   value={examType || ''}
-                  onChange={e => setExamType(e.target.value as ExamType)}
+                  onChange={handleExamTypeChange}
                   className="input-field w-full"
                   style={{ background: 'rgba(99,119,255,0.06)', color: 'var(--text-primary)', border: '1px solid rgba(99,119,255,0.15)' }}
                   aria-label="Select exam type"
@@ -156,7 +179,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                     id="exam-date"
                     type="date"
                     value={examDate}
-                    onChange={e => setExamDate(e.target.value)}
+                    onChange={handleExamDateChange}
                     min={new Date().toISOString().slice(0, 10)}
                     className="input-field"
                     style={{ colorScheme: 'dark' }}
@@ -166,7 +189,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               )}
 
               <div className="flex gap-3">
-                <button onClick={() => setStep(1)} className="btn-secondary" aria-label="Go back">← Back</button>
+                <button onClick={handleStepBack} className="btn-secondary" aria-label="Go back">← Back</button>
                 <button
                   onClick={handleComplete}
                   disabled={!examType}

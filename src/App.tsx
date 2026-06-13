@@ -9,24 +9,53 @@ import JournalPage from './pages/JournalPage'
 import ChatPage from './pages/ChatPage'
 import InsightsPage from './pages/InsightsPage'
  
+import { STORAGE_KEYS } from './constants'
+
+interface SettingsModalProps {
+  onClose: () => void
+}
+
 // Settings modal for API key management
-function SettingsModal({ onClose }: { onClose: () => void }) {
-  const [key, setKey] = useState(() => localStorage.getItem('ag_api_key') ?? '')
+function SettingsModal({ onClose }: SettingsModalProps) {
+  const [key, setKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) ?? '')
   const [saved, setSaved] = useState(false)
  
   const handleSave = () => {
-    if (key.trim()) localStorage.setItem('ag_api_key', key.trim())
-    else localStorage.removeItem('ag_api_key')
+    if (key.trim()) {
+      localStorage.setItem(STORAGE_KEYS.API_KEY, key.trim())
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.API_KEY)
+    }
     setSaved(true)
-    setTimeout(() => { setSaved(false); onClose() }, 1000)
+    setTimeout(() => { 
+      setSaved(false)
+      onClose() 
+    }, 1000)
   }
  
+  const handleResetData = () => {
+    if (confirm('This will delete all your moods, journals, and chat history. Are you sure?')) {
+      Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k))
+      window.location.reload()
+    }
+  }
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose()
+    }
+  }
+
+  const handleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setKey(e.target.value)
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
       role="dialog" aria-modal="true" aria-label="Settings"
-      onClick={e => e.target === e.currentTarget && onClose()}
+      onClick={handleBackdropClick}
     >
       <div className="card w-full max-w-md animate-fade-in-up space-y-5">
         <div className="flex items-center justify-between">
@@ -44,7 +73,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             id="api-key-input"
             type="password"
             value={key}
-            onChange={e => setKey(e.target.value)}
+            onChange={handleKeyChange}
             placeholder="sk-ant-…"
             className="input-field font-mono text-sm"
             aria-describedby="api-key-desc"
@@ -71,12 +100,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
         <div style={{ borderTop: '1px solid rgba(99,119,255,0.1)', paddingTop: '1rem' }}>
           <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>DANGER ZONE</p>
           <button
-            onClick={() => {
-              if (confirm('This will delete all your moods, journals, and chat history. Are you sure?')) {
-                ['ag_profile', 'ag_moods', 'ag_journals', 'ag_chat', 'ag_api_key', 'ag_latest_insight', 'ag_journal_draft', 'ag_rate'].forEach(k => localStorage.removeItem(k))
-                window.location.reload()
-              }
-            }}
+            onClick={handleResetData}
             className="text-xs px-3 py-1.5 rounded-lg transition-all"
             style={{ background: 'rgba(251,113,133,0.1)', color: '#fb7185', border: '1px solid rgba(251,113,133,0.2)' }}
             type="button"

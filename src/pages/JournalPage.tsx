@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import type { JournalEntry, UserProfile } from '../types'
 import JournalEditor from '../components/JournalEditor'
-import { journalStorage, generateId } from '../utils/storage'
+import { useJournalEntries } from '../hooks/useJournalEntries'
 import { format } from 'date-fns'
  
 interface JournalPageProps {
@@ -10,22 +10,22 @@ interface JournalPageProps {
   onJournalsUpdate: (journals: JournalEntry[]) => void
 }
  
-export default function JournalPage({ profile, journals, onJournalsUpdate }: JournalPageProps) {
-  const [saving, setSaving] = useState(false)
+export default function JournalPage({ profile, onJournalsUpdate }: JournalPageProps) {
+  const { journals, saving, error, addJournal } = useJournalEntries()
   const [expandedId, setExpandedId] = useState<string | null>(null)
  
-  const handleSave = useCallback((content: string) => {
-    setSaving(true)
-    const entry: JournalEntry = {
-      id: generateId(),
-      timestamp: new Date().toISOString(),
-      content,
-      examType: profile.examType,
-    }
-    journalStorage.save(entry)
-    onJournalsUpdate(journalStorage.getAll())
-    setSaving(false)
-  }, [profile.examType, onJournalsUpdate])
+  // Sync back to global/parent state
+  useEffect(() => {
+    onJournalsUpdate(journals)
+  }, [journals, onJournalsUpdate])
+ 
+  const handleSave = (content: string) => {
+    addJournal(content, profile.examType)
+  }
+ 
+  const handleToggleExpand = (id: string) => {
+    setExpandedId(prevId => prevId === id ? null : id)
+  }
  
   return (
     <div className="space-y-6">
@@ -35,6 +35,14 @@ export default function JournalPage({ profile, journals, onJournalsUpdate }: Jou
           Write freely — your thoughts, progress, and feelings during {profile.examType} prep
         </p>
       </div>
+ 
+      {/* Error message */}
+      {error && (
+        <div className="p-3 rounded-xl text-sm font-medium text-center animate-fade-in"
+          style={{ background: 'rgba(251,113,133,0.1)', border: '1px solid rgba(251,113,133,0.3)', color: '#fb7185' }}>
+          ⚠️ {error}
+        </div>
+      )}
  
       {/* Editor */}
       <div className="animate-fade-in-up">
@@ -64,7 +72,7 @@ export default function JournalPage({ profile, journals, onJournalsUpdate }: Jou
               return (
                 <div key={entry.id} className="transition-all duration-200">
                   <button
-                    onClick={() => setExpandedId(isExpanded ? null : entry.id)}
+                    onClick={() => handleToggleExpand(entry.id)}
                     className="w-full text-left p-4 rounded-xl transition-all hover:bg-[rgba(99,119,255,0.06)]"
                     style={{ 
                       background: isExpanded ? 'rgba(99,119,255,0.06)' : 'rgba(99,119,255,0.03)', 

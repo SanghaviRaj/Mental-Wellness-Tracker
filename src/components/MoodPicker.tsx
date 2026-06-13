@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { MoodScore, ExamType } from '../types'
 import { validateMoodInput } from '../utils/sanitize'
+import { CHARACTER_LIMITS } from '../constants'
  
 const MOODS: { score: MoodScore; emoji: string; label: string }[] = [
   { score: 1, emoji: '😞', label: 'Very Low' },
@@ -22,6 +23,23 @@ export default function MoodPicker({ examType, onSave, loading = false }: MoodPi
   const [note, setNote] = useState('')
   const [validationError, setValidationError] = useState('')
  
+  const handleMoodSelect = (score: MoodScore) => {
+    setSelectedMood(score)
+    setValidationError('')
+  }
+ 
+  const handleStressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStress(Number(e.target.value))
+  }
+ 
+  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    setNote(val)
+    if (val.length <= CHARACTER_LIMITS.MOOD_NOTE_MAX_LENGTH) {
+      setValidationError('')
+    }
+  }
+ 
   const handleSave = () => {
     if (!selectedMood) {
       setValidationError('Please select a mood.')
@@ -33,8 +51,8 @@ export default function MoodPicker({ examType, onSave, loading = false }: MoodPi
       return
     }
  
-    if (note.length > 100) {
-      setValidationError('Note must be 100 characters or less.')
+    if (note.length > CHARACTER_LIMITS.MOOD_NOTE_MAX_LENGTH) {
+      setValidationError(`Note must be ${CHARACTER_LIMITS.MOOD_NOTE_MAX_LENGTH} characters or less.`)
       return
     }
  
@@ -46,6 +64,7 @@ export default function MoodPicker({ examType, onSave, loading = false }: MoodPi
   }
  
   const stressColor = stress <= 3 ? '#2dd4bf' : stress <= 6 ? '#fbbf24' : '#fb7185'
+  const maxNoteLen = CHARACTER_LIMITS.MOOD_NOTE_MAX_LENGTH
  
   return (
     <div className="card space-y-6">
@@ -61,27 +80,29 @@ export default function MoodPicker({ examType, onSave, loading = false }: MoodPi
  
       {/* Mood emoji row */}
       <div className="flex justify-between px-2" role="group" aria-label="Mood selection">
-        {MOODS.map(({ score, emoji, label }) => (
-          <button
-            key={score}
-            onClick={() => {
-              setSelectedMood(score)
-              setValidationError('')
-            }}
-            className={`mood-emoji ${selectedMood === score ? 'selected' : ''} flex flex-col items-center gap-1`}
-            aria-label={`Mood: ${label}`}
-            aria-pressed={selectedMood === score}
-            type="button"
-          >
-            <span className="text-3xl">{emoji}</span>
-            <span className="text-xs font-medium" style={{
-              color: selectedMood === score ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontSize: '0.65rem'
-            }}>
-              {label}
-            </span>
-          </button>
-        ))}
+        {MOODS.map(({ score, emoji, label }) => {
+          const isSelected = selectedMood === score
+          const selectThisMood = () => handleMoodSelect(score)
+          
+          return (
+            <button
+              key={score}
+              onClick={selectThisMood}
+              className={`mood-emoji ${isSelected ? 'selected' : ''} flex flex-col items-center gap-1`}
+              aria-label={`Mood: ${label}`}
+              aria-pressed={isSelected}
+              type="button"
+            >
+              <span className="text-3xl">{emoji}</span>
+              <span className="text-xs font-medium" style={{
+                color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                fontSize: '0.65rem'
+              }}>
+                {label}
+              </span>
+            </button>
+          )
+        })}
       </div>
  
       {selectedMood && (
@@ -99,7 +120,7 @@ export default function MoodPicker({ examType, onSave, loading = false }: MoodPi
               min={1}
               max={10}
               value={stress}
-              onChange={e => setStress(Number(e.target.value))}
+              onChange={handleStressChange}
               className="w-full"
               aria-label="Stress level"
               aria-valuemin={1}
@@ -121,18 +142,15 @@ export default function MoodPicker({ examType, onSave, loading = false }: MoodPi
               <label className="text-sm font-medium block" style={{ color: 'var(--text-secondary)' }}>
                 Quick note <span className="opacity-60">(optional)</span>
               </label>
-              <span className="text-xs" style={{ color: note.length > 100 ? '#fb7185' : 'var(--text-secondary)' }}>
-                {note.length}/100
+              <span className="text-xs" style={{ color: note.length > maxNoteLen ? '#fb7185' : 'var(--text-secondary)' }}>
+                {note.length}/{maxNoteLen}
               </span>
             </div>
             <textarea
               value={note}
-              onChange={e => {
-                setNote(e.target.value)
-                if (e.target.value.length <= 100) setValidationError('')
-              }}
+              onChange={handleNoteChange}
               placeholder="What's on your mind right now?"
-              maxLength={100}
+              maxLength={maxNoteLen}
               rows={2}
               className="input-field resize-none"
               aria-label="Optional mood note"
@@ -145,7 +163,7 @@ export default function MoodPicker({ examType, onSave, loading = false }: MoodPi
  
           <button
             onClick={handleSave}
-            disabled={loading || note.length > 100}
+            disabled={loading || note.length > maxNoteLen}
             className="btn-primary w-full relative z-10"
             aria-label="Save mood log"
             type="button"
