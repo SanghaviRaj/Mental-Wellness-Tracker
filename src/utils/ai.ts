@@ -9,7 +9,7 @@ const getKey = (): string => {
   return key
 }
  
-function checkRateLimit(): void {
+export function checkRateLimit(): void {
   const now = Date.now()
   const windowStart = now - RATE_LIMITS.AI_WINDOW_MS
   const raw = localStorage.getItem(STORAGE_KEYS.RATE_LIMIT) ?? '[]'

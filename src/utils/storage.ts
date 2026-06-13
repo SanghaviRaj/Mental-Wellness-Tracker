@@ -1,8 +1,7 @@
 // Thin typed localStorage wrapper — no DB needed
 import type { MoodLog, JournalEntry, ChatMessage, UserProfile, InsightResult } from '../types'
-import { STORAGE_KEYS } from '../constants'
+import { STORAGE_KEYS, STORAGE_LIMITS } from '../constants'
  
-const CHAT_LIMIT = 50
  
 function read<T>(key: string): T[] {
   try {
@@ -67,7 +66,7 @@ export const chatStorage = {
     return read<ChatMessage>(STORAGE_KEYS.CHAT)
   },
   save(msgs: ChatMessage[]): void {
-    write(STORAGE_KEYS.CHAT, msgs.slice(-CHAT_LIMIT))
+    write(STORAGE_KEYS.CHAT, msgs.slice(-STORAGE_LIMITS.CHAT_MAX_MESSAGES))
   },
   clear(): void {
     localStorage.removeItem(STORAGE_KEYS.CHAT)

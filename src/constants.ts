@@ -34,3 +34,7 @@ export const BOX_BREATHING = {
   CYCLE_SECONDS: 4,
   MAX_CYCLES: 4,
 } as const
+
+export const STORAGE_LIMITS = {
+  CHAT_MAX_MESSAGES: 50,
+} as const
